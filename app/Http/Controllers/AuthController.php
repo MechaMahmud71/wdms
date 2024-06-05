@@ -3,32 +3,31 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginUser;
-use App\Models\User;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-
+use App\DTO\LoginUserDTO;
+use App\DTO\RegisterUserDTO;
 use App\Http\Requests\RegisterUser;
 use App\Traits\HttpResponse;
 use Illuminate\Http\Request;
+use App\Services\UserService;
 
 class AuthController extends Controller
 {
     use HttpResponse;
 
+    public function __construct(protected UserService $userService)
+    {
+    }
+
     public function login(LoginUser $request)
     {
         $request->validated($request->only(['email', 'password']));
 
-        if (!Auth::attempt($request->only(['email', 'password']))) {
-            return $this->error('', 'Credentials do not match', 401);
-        }
+        $loginUserDTO = new LoginUserDTO(
+            email: $request->email,
+            password: $request->password
+        );
 
-        $user = User::where('email', $request->email)->first();
-
-        $user['token'] = $user->createToken('API Token')->plainTextToken;
-
-
-        return $this->success($user);
+        return $this->userService->login($loginUserDTO);
     }
 
     public function register(RegisterUser $request)
@@ -36,21 +35,17 @@ class AuthController extends Controller
 
         $request->validated($request->only(['userName', 'email', 'password']));
 
-        $user = User::create([
-            'userName' => $request->userName,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+        $registerUserDTO = new RegisterUserDTO(
+            userName: $request->userName,
+            email: $request->email,
+            password: $request->password
+        );
 
-        $user['token'] = $user->createToken('API Token')->plainTextToken;
-
-        return $this->success($user);
+        return $this->userService->register($registerUserDTO);
     }
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-
-        return $this->success("Successfully logged out");
+        return $this->userService->logout($request->user());
     }
 }
